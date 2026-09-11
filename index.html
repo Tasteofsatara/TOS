@@ -1995,7 +1995,7 @@ async function updateItemStatus(itemIdx, encodedSrNo){
   const cardEl    = document.getElementById('card-' + itemIdx);
   const newStatus = selectEl.value;
   const btn       = cardEl.querySelector('.isc-btn');
-  // Read edited qty/weight — only for FARAL orders
+  
   const o0     = allOrders.find(x => (x.groupKey||x.id) === editingKey);
   const isFaralOrder = o0?.orderType === 'FARAL';
   const newWt  = isFaralOrder ? (parseInt(document.getElementById('isc-wt-' +itemIdx)?.value)||0) : 0;
@@ -2004,13 +2004,33 @@ async function updateItemStatus(itemIdx, encodedSrNo){
   btn.textContent = '⏳';
   btn.disabled    = true;
 
+  let newTotalAmtForSheet = undefined;
+
   // Update local copy
   const o = allOrders.find(x => (x.groupKey||x.id) === editingKey);
   if(o && o.items && o.items[itemIdx]){
     o.items[itemIdx].itemStatus = newStatus;
-    if(newWt  > 0) o.items[itemIdx].weight = newWt;
-    if(newQty > 0) o.items[itemIdx].qty    = newQty;
-    // FIX 3: Overall order status = LEAST advanced item status
+    
+    // RECALCULATE AMOUNT FOR FARAL
+    if(isFaralOrder && (newWt > 0 || newQty > 0)) {
+      const master = (typeof ITEMS !== 'undefined') ? ITEMS.find(x => x.en === o.items[itemIdx].en) : null;
+      const pricePerKg = master ? master.price : Math.round((Number(o.items[itemIdx].unitPrice)||0) / (Number(o.items[itemIdx].weight)||250) * 1000);
+      
+      if(newWt > 0) o.items[itemIdx].weight = newWt;
+      if(newQty > 0) o.items[itemIdx].qty   = newQty;
+      
+      const newUnitPrice = Math.round((pricePerKg / 1000) * o.items[itemIdx].weight);
+      o.items[itemIdx].unitPrice = newUnitPrice;
+      
+      // Update Grand Total
+      o.total = o.items.reduce((sum, item) => sum + (item.unitPrice * item.qty), 0);
+      newTotalAmtForSheet = newUnitPrice * o.items[itemIdx].qty;
+
+      // Update the visual Grand Total in the DOM
+      const totalRowSpan = document.querySelector('.order-summary .total-row span:last-child');
+      if(totalRowSpan) totalRowSpan.textContent = fmtAmt(o.total);
+    }
+
     const statusOrder = STATUS_OPTIONS;
     const activeItems = o.items.filter(i => (i.itemStatus||'CONFIRMED') !== 'CANCELLED');
     const minIdx = activeItems.length
@@ -2018,9 +2038,9 @@ async function updateItemStatus(itemIdx, encodedSrNo){
       : statusOrder.indexOf(newStatus);
     const prevStatus = o.status;
     o.status = statusOrder[Math.max(0, minIdx)] || 'CONFIRMED';
-    // Store new status for WA trigger after fetch
     o._prevStatus = prevStatus;
   }
+  
   CFG.set('tos_admin_cache', allOrders);
   renderStats(); renderTable();
 
@@ -2038,11 +2058,21 @@ async function updateItemStatus(itemIdx, encodedSrNo){
   try {
     let body;
     if(srNo && srNo !== 'undefined' && srNo !== ''){
-      body = JSON.stringify({ action:'update_item', srNo, orderStatus: newStatus,
-        deliveryWeight: newWt, qty: newQty });
+      // ADDED: newAmount property sent to backend
+      body = JSON.stringify({ 
+        action:'update_item', 
+        srNo, 
+        orderStatus: newStatus,
+        deliveryWeight: newWt, 
+        qty: newQty,
+        newAmount: newTotalAmtForSheet 
+      });
     } else {
-      body = JSON.stringify({ action:'update_order', orderId: editingKey,
-        fields:{ orderStatus: newStatus } });
+      body = JSON.stringify({ 
+        action:'update_order', 
+        orderId: editingKey,
+        fields:{ orderStatus: newStatus } 
+      });
     }
     const resp = await fetch(SCRIPT_URL, {
       method:'POST', headers:{'Content-Type':'text/plain'}, body
@@ -2052,7 +2082,6 @@ async function updateItemStatus(itemIdx, encodedSrNo){
       btn.textContent = '✓ Done'; btn.classList.add('done');
       cardEl.classList.add('updated');
       toast('✅ ' + (o?.items?.[itemIdx]?.en||'Item') + ' → ' + newStatus);
-      // Trigger WhatsApp prompt if order reached a milestone
       if(o && o._prevStatus !== o.status){
         waTriggerStatus(o, o._prevStatus, o.status);
         delete o._prevStatus;

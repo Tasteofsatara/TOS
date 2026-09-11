@@ -442,6 +442,30 @@ body.mode-admin    .toast{bottom:16px;}
 .msg-preview.open{display:block;}
 .msg-save-btn{margin-top:10px;padding:9px 20px;background:var(--maroon);color:#fff;border:none;border-radius:var(--r-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;}
 .msg-reset-btn{margin-top:10px;margin-left:8px;padding:9px 14px;background:transparent;color:var(--text3);border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+/* Mobile Adjustments for Production Tab */
+@media (max-width: 768px) {
+  .prod-item-hdr {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .prod-ih-name {
+    width: 100%;
+    border-bottom: 1px solid var(--border);
+  }
+  .prod-ih-cell {
+    flex: 1 1 30%;
+    border-left: none;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 4px;
+    min-width: 0;
+  }
+}
+
+/* Ensure the customer details table can scroll horizontally on small screens */
+.prod-detail {
+  overflow-x: auto;
+}
 </style>
 <!-- PWA -->
 <meta name="mobile-web-app-capable" content="yes">
@@ -1145,7 +1169,7 @@ function buildSheetRows(order){
     const itemAmt = Math.round((pricePerKg / 1000) * ci.weight * ci.qty);
     const amount = isFaral ? itemAmt : (i === 0 ? comboTotal : 0);
     rows.push({
-      srNo:            isFaral ? order.uuid : order.uuid+'-'+(i+1),
+      srNo:            order.uuid + '-' + (i+1),
       orderDate:       dateStr,
       name:            order.customer,
       phone:           order.phone,

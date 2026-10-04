@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Taste of Satara</title>
-<meta name="description" content="खमंग, खुसखुशीत आणि घरगुती फराळ! — Online Order करा">
+<meta name="description" content="खमंग, खुसखुशीत आणि घरगुती फराळ — Online Order करा">
 <meta name="theme-color" content="#8B1A1A">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1065,7 +1065,10 @@ async function testConn(){
 
 // ══ CUSTOMER JS ══
 
-let scratchDiscount = 0;
+// ══ CUSTOMER JS ══
+
+// TWEAK 1: Changed 'let' to 'var' to prevent page freezing/crashing
+var scratchDiscount = 0;
 
 function initScratchCard() {
   const canvas = document.getElementById('scratchCanvas');
@@ -1118,10 +1121,10 @@ function initScratchCard() {
   ctx.font = 'bold 20px "DM Sans", sans-serif';
   ctx.fillText('✨ Scratch & Win ✨', W / 2, H / 2 - 9);
   ctx.font = '600 12px "DM Sans", sans-serif';
-  ctx.fillText(  •  Scratch here', W / 2, H / 2 + 16);
+  ctx.fillText('👆 Scratch here', W / 2, H / 2 + 16);
   ctx.shadowColor = 'transparent';
 
-  let isDrawing = false, hasScratched = false, revealed = false, lastCheck = 0;
+  let isDrawing = false, revealed = false, lastCheck = 0;
 
   function getXY(e) {
     const r = canvas.getBoundingClientRect();
@@ -1153,6 +1156,10 @@ function initScratchCard() {
       setTimeout(() => c.remove(), 1000);
     }
     if (navigator.vibrate) navigator.vibrate([40, 30, 80]);
+
+    // TWEAK 2: Moved the cart update here so the math only updates AFTER they win!
+    updateCartBar();
+    if (document.querySelector('.order-summary .total-row span:last-child')) openReview();
   }
 
   function scratch(e) {
@@ -1166,11 +1173,6 @@ function initScratchCard() {
     ctx.fill();
     box.classList.add('touched');
 
-    if (!hasScratched) {
-      hasScratched = true;
-      updateCartBar();
-      if (document.querySelector('.order-summary .total-row span:last-child')) openReview();
-    }
     const now = Date.now();
     if (now - lastCheck > 120) {            // throttle the pixel check
       lastCheck = now;
@@ -1511,7 +1513,9 @@ function setType(t){
   activeType=t;
   cart={type:t,items:[],selectedIds:[],comboPrice:null};
   renderTabs();renderBody();updateCartBar();
-  initScratchCard(); // <--- ADD THIS HERE
+  setTimeout(() => {
+    if (typeof initScratchCard === 'function') initScratchCard();
+  }, 50); // <--- ADD THIS HERE
 }
 
 // ══════════════════════════════════════════

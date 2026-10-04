@@ -530,7 +530,7 @@ body.mode-admin    .toast{bottom:16px;}
     </div>
     <div class="brand">
       <div class="brand-name">Taste of Satara</div>
-      <div class="brand-sub">खमंग, खुसखुशीत आणि घरगुती फराळ! 🪔</div>
+      <div class="brand-sub">खमंग, खुसखुशीत आणि घरगुती फराळ 🪔</div>
     </div>
     <button class="settings-btn" onclick="showPWAInstructions()" 
       style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);
@@ -966,7 +966,7 @@ const _ORIGINAL_HTML = document.documentElement.outerHTML;
 //  SHARED CONFIG  (must be first — used by all JS below)
 // ══════════════════════════════
 const CFG = {
-  get(k,d){ try{ return JSON.parse(localStorage.getItem(k))??d; }catch{ return d; } },
+  get(k,d){ try{ return JSON.parse(localStorage.getItem(k)) || d; }catch{ return d; } },
   set(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
 };
 
@@ -1062,8 +1062,6 @@ async function testConn(){
   }catch(e){if(el){el.className='conn-status fail';el.textContent='❌ Failed: '+e.message;}}
 }
 
-
-// ══ CUSTOMER JS ══
 
 // ══ CUSTOMER JS ══
 
@@ -2084,9 +2082,9 @@ function openEdit(encodedKey){
             ${o.orderType==='FARAL' ? `
             <div class="isc-edit-row">
               <label>Wt(g):</label>
-              <input type="number" id="isc-wt-${idx}" value="${ci.weight\vert{}\vert{}250}" min="1" max="5000" oninput="recalcItemAmt(${idx})">
+              <input type="number" id="isc-wt-${idx}" value="${ci.weight||250}" min="1" max="5000" oninput="recalcItemAmt(${idx})">
               <label>Qty:</label>
-              <input type="number" id="isc-qty-${idx}" value="${ci.qty\vert{}\vert{}1}" min="1" max="99" oninput="recalcItemAmt(${idx})">
+              <input type="number" id="isc-qty-${idx}" value="${ci.qty||1}" min="1" max="99" oninput="recalcItemAmt(${idx})">
               <label>Amt(₹):</label>
               <input type="number" id="isc-amt-${idx}" value="${ci.unitPrice||0}" min="0" style="width:65px;">
             </div>` : `

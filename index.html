@@ -2074,12 +2074,13 @@ function openEdit(encodedKey){
     ? (o.items||[]).map((ci, idx) => {
         const iid  = 'isc-' + idx;
         const srid = ci.srNo || '';
+        const unitP = Number(ci.unitPrice) || 0;
         return `
         <div class="item-status-card" id="card-${idx}">
           <div class="isc-emoji">🍱</div>
           <div class="isc-info">
             <div class="isc-name">${ci.en||'Item'}</div>
-            <div class="isc-sub" id="isc-sub-${idx}">${ci.weight||''}g × ${ci.qty||1}${(Number(ci.unitPrice)||0)>0?' · '+fmtAmt(ci.unitPrice):''}</div>
+            <div class="isc-sub" id="isc-sub-${idx}">${ci.weight||''}g × ${ci.qty||1}${unitP>0?' · '+fmtAmt(unitP):''}</div>
             ${o.orderType==='FARAL' ? `
             <div class="isc-edit-row">
               <label>Wt(g):</label>
@@ -2172,7 +2173,9 @@ function openEdit(encodedKey){
     <div style="height:14px;"></div>
   `;
 
-  { const _o=document.getElementById('overlay'); _o.style.display='flex'; requestAnimationFrame(()=>_o.classList.add('open')); }
+  const _o = document.getElementById('overlay');
+  _o.style.display = 'flex';
+  requestAnimationFrame(() => _o.classList.add('open'));
 }
 
 // ── Live amount recalc when Wt or Qty changes in edit modal ──
@@ -2206,11 +2209,16 @@ async function updateItemStatus(itemIdx, encodedSrNo){
   const btn       = cardEl.querySelector('.isc-btn');
   
   const o0     = allOrders.find(x => (x.groupKey||x.id) === editingKey);
-  const isFaralOrder = o0?.orderType === 'FARAL';
+  const isFaralOrder = o0 && o0.orderType === 'FARAL';
   
-  const newWt  = isFaralOrder ? (parseInt(document.getElementById('isc-wt-' +itemIdx)?.value)||0) : 0;
-  const newQty = isFaralOrder ? (parseInt(document.getElementById('isc-qty-'+itemIdx)?.value)||1) : 0;
-  const newAmt = isFaralOrder ? parseInt(document.getElementById('isc-amt-'+itemIdx)?.value) : undefined;
+  const wtEl = document.getElementById('isc-wt-' + itemIdx);
+  const newWt = (isFaralOrder && wtEl && wtEl.value !== '') ? parseInt(wtEl.value) : 0;
+  
+  const qtyEl = document.getElementById('isc-qty-' + itemIdx);
+  const newQty = (isFaralOrder && qtyEl && qtyEl.value !== '') ? parseInt(qtyEl.value) : 0;
+  
+  const amtEl = document.getElementById('isc-amt-' + itemIdx);
+  const newAmt = (isFaralOrder && amtEl && amtEl.value !== '') ? parseInt(amtEl.value) : undefined;
 
   btn.textContent = '⏳';
   btn.disabled    = true;
@@ -2224,19 +2232,17 @@ async function updateItemStatus(itemIdx, encodedSrNo){
     
     const currentWt  = Number(o.items[itemIdx].weight) || 0;
     const currentQty = Number(o.items[itemIdx].qty) || 1;
-    const currentAmt = Number(o.items[itemIdx].unitPrice) || 0; // Note: unitPrice holds the row's total amount
+    const currentAmt = Number(o.items[itemIdx].unitPrice) || 0; 
     
     // Re-calculate ONLY if anything was actually modified
     if(isFaralOrder && (newWt !== currentWt || newQty !== currentQty || newAmt !== currentAmt)) {
       if(newWt > 0) o.items[itemIdx].weight = newWt;
       if(newQty > 0) o.items[itemIdx].qty   = newQty;
       
-      // Use the manual/auto-calculated amount from the input box
       const finalItemAmt = (newAmt !== undefined && !isNaN(newAmt)) ? newAmt : currentAmt;
       o.items[itemIdx].unitPrice = finalItemAmt;
       newTotalAmtForSheet = finalItemAmt;
       
-      // Update Grand Total 
       o.total = o.items.reduce((sum, item) => sum + Number(item.unitPrice || 0), 0);
 
       const totalRowSpan = document.querySelector('.order-summary .total-row span:last-child');
@@ -2275,7 +2281,7 @@ async function updateItemStatus(itemIdx, encodedSrNo){
     if(srNo && srNo !== 'undefined' && srNo !== ''){
       body = JSON.stringify({ 
         action:'update_item', 
-        srNo, 
+        srNo: srNo, 
         orderStatus: newStatus,
         deliveryWeight: newWt, 
         qty: newQty,
@@ -2289,13 +2295,14 @@ async function updateItemStatus(itemIdx, encodedSrNo){
       });
     }
     const resp = await fetch(SCRIPT_URL, {
-      method:'POST', headers:{'Content-Type':'text/plain'}, body
+      method:'POST', headers:{'Content-Type':'text/plain'}, body: body
     });
     const data = JSON.parse(await resp.text());
     if(data.status === 'ok'){
       btn.textContent = '✓ Done'; btn.classList.add('done');
       cardEl.classList.add('updated');
-      toast('✅ ' + (o?.items?.[itemIdx]?.en||'Item') + ' → ' + newStatus);
+      const itemName = (o && o.items && o.items[itemIdx]) ? o.items[itemIdx].en : 'Item';
+      toast('✅ ' + itemName + ' → ' + newStatus);
       if(o && o._prevStatus !== o.status){
         waTriggerStatus(o, o._prevStatus, o.status);
         delete o._prevStatus;
@@ -2312,12 +2319,18 @@ async function updateItemStatus(itemIdx, encodedSrNo){
 
 // ── Save payment/delivery fields (applies to ALL rows of this order) ──
 function savePaymentDetails(){
+  const pstatusEl = document.getElementById('f-pstatus');
+  const pmodeEl   = document.getElementById('f-pmode');
+  const pdateEl   = document.getElementById('f-pdate');
+  const ddateEl   = document.getElementById('f-ddate');
+  const idbiEl    = document.getElementById('f-idbi');
+
   const fields = {
-    paymentStatus: document.getElementById('f-pstatus').value,
-    paymentMode  : document.getElementById('f-pmode').value,
-    paymentDate  : document.getElementById('f-pdate').value,
-    deliveryDate : document.getElementById('f-ddate').value,
-    toIDBI       : document.getElementById('f-idbi').value,
+    paymentStatus: pstatusEl ? pstatusEl.value : '',
+    paymentMode  : pmodeEl ? pmodeEl.value : '',
+    paymentDate  : pdateEl ? pdateEl.value : '',
+    deliveryDate : ddateEl ? ddateEl.value : '',
+    toIDBI       : idbiEl ? idbiEl.value : ''
   };
   closeOverlay();
   saveUpdate(editingKey, fields);

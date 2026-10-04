@@ -380,11 +380,36 @@ body.mode-admin    .toast{bottom:16px;}
 .login-hint{font-size:11px;color:var(--text3);text-align:center;margin-top:12px;line-height:1.6;}
 
 /* ── OFFERS & SCRATCH CARD ── */
-.offer-section { background: var(--white); border: 1.5px dashed var(--gold); border-radius: var(--r); padding: 14px; margin-bottom: 14px; text-align: center; }
-.offer-title { font-size: 15px; font-family: 'Tiro Devanagari Marathi', serif; color: var(--maroon); margin-bottom: 10px; font-weight: bold; }
-.scratch-container { position: relative; width: 220px; height: 60px; margin: 0 auto; user-select: none; }
-.scratch-reward { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--green-bg); color: var(--green); font-weight: 700; font-size: 16px; border-radius: 8px; border: 1px solid var(--green); z-index: 1; }
-.scratch-canvas { position: absolute; inset: 0; z-index: 2; border-radius: 8px; cursor: pointer; touch-action: none; }
+.offer-section{position:relative;overflow:hidden;margin:0 0 14px;padding:16px 14px 14px;text-align:center;border-radius:var(--r);
+  background:linear-gradient(145deg,#FFF9F3 0%,#FDEBC8 55%,#F8D9A0 100%);border:1.5px solid var(--gold);
+  box-shadow:0 6px 18px rgba(139,26,26,.12),inset 0 0 0 3px rgba(255,255,255,.6);}
+.offer-section::before,.offer-section::after{content:'';position:absolute;width:90px;height:90px;border-radius:50%;
+  background:radial-gradient(circle,rgba(200,147,42,.25),transparent 70%);pointer-events:none;}
+.offer-section::before{top:-30px;left:-30px;}
+.offer-section::after{bottom:-30px;right:-30px;}
+.offer-title{position:relative;font-family:'Tiro Devanagari Marathi',serif;font-size:18px;font-weight:bold;color:var(--maroon);margin-bottom:4px;}
+.offer-title .gift{display:inline-block;animation:giftWiggle 2.4s ease-in-out infinite;transform-origin:50% 80%;}
+@keyframes giftWiggle{0%,70%,100%{transform:rotate(0)}75%{transform:rotate(-14deg)}85%{transform:rotate(12deg)}92%{transform:rotate(-8deg)}}
+.offer-sub{position:relative;font-size:12px;color:var(--text2);margin-bottom:12px;}
+.offer-sub b{color:var(--maroon);}
+.scratch-container{position:relative;width:100%;max-width:300px;height:92px;margin:0 auto;user-select:none;-webkit-user-select:none;
+  border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.18);}
+.scratch-reward{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  border-radius:12px;border:2px solid var(--green);color:var(--green);
+  background:radial-gradient(circle at 50% 40%,#FFFFFF 0%,#E8F5E9 70%);}
+.scratch-reward .amt{font-size:30px;font-weight:700;line-height:1;letter-spacing:-.5px;}
+.scratch-reward .lbl{font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;opacity:.8;}
+.scratch-container.won .scratch-reward{animation:rewardPop .6s cubic-bezier(.2,1.4,.4,1);}
+@keyframes rewardPop{0%{transform:scale(.85)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+.scratch-canvas{position:absolute;inset:0;z-index:2;width:100%;height:100%;border-radius:12px;cursor:pointer;touch-action:none;transition:opacity .5s ease;}
+.scratch-container.won .scratch-canvas{opacity:0;pointer-events:none;}
+.scratch-container:not(.won):not(.touched){animation:scratchPulse 2s ease-in-out infinite;}
+@keyframes scratchPulse{0%,100%{box-shadow:0 4px 12px rgba(0,0,0,.18)}50%{box-shadow:0 4px 22px rgba(200,147,42,.7)}}
+.offer-note{position:relative;font-size:11px;color:var(--text3);margin-top:10px;}
+.confetti-bit{position:absolute;top:50%;left:50%;width:7px;height:10px;border-radius:2px;z-index:3;pointer-events:none;
+  animation:confettiFly .9s ease-out forwards;}
+@keyframes confettiFly{to{transform:translate(var(--dx),var(--dy)) rotate(var(--rot));opacity:0}}
+
 
 /* ══ PRODUCTION TAB ══ */
 .prod-wrap{padding:14px 14px 100px;}
@@ -520,14 +545,14 @@ body.mode-admin    .toast{bottom:16px;}
 </div>
 <div id="view-customer">
 <div class="offer-section" id="offerSection">
-  <div class="offer-title">🎁 आजची खास ऑफर!</div>
+  <div class="offer-title"><span class="gift">🎁</span> आजची दिवाळी ऑफर!</div>
+  <div class="offer-sub"> <b>स्क्रॅच करा आणि मिळवा हमखास डिस्काउंट!!!</b> </div>
   <div class="scratch-container" id="scratchContainer">
-    <div class="scratch-reward" id="scratchReward">₹0 Discount!</div>
-    <canvas class="scratch-canvas" id="scratchCanvas" width="220" height="60"></canvas>
+    <div class="scratch-reward" id="scratchReward"><span class="amt">₹0</span><span class="lbl">Discount</span></div>
+    <canvas class="scratch-canvas" id="scratchCanvas"></canvas>
   </div>
-  <div style="font-size:11px;color:var(--text3);margin-top:8px;">Scratch to win up to ₹10 off your order!</div>
-</div>  
-<div class="body" id="body-area"></div>
+  <div class="offer-note" id="scratchNote">👆 Scratch the card to win discount on your order value!</div>
+</div>
 
 <!-- Cart bar -->
 <div class="cart-bar" id="cart-bar" style="display:none;">
@@ -1043,70 +1068,123 @@ let scratchDiscount = 0;
 
 function initScratchCard() {
   const canvas = document.getElementById('scratchCanvas');
-  if (!canvas) return; // Guard clause in case we are on a screen without the canvas
-  
-  const ctx = canvas.getContext('2d');
+  if (!canvas) return;
+  const box = document.getElementById('scratchContainer');
   const rewardEl = document.getElementById('scratchReward');
+  const noteEl = document.getElementById('scratchNote');
+  const ctx = canvas.getContext('2d');
 
-  // Generate random reward up to ₹15
+  // Random reward ₹1–₹15
   scratchDiscount = Math.floor(Math.random() * 15) + 1;
-  rewardEl.textContent = `🎉 ₹${scratchDiscount} Discount!`;
+  rewardEl.innerHTML = `<span class="amt">🎉 ₹${scratchDiscount}</span><span class="lbl">Discount unlocked</span>`;
+  box.classList.remove('won', 'touched');
 
-  // Draw the gold cover
-  ctx.fillStyle = '#C8932A'; 
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
-  // Add instructions on the cover
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 14px DM Sans';
+  // Crisp canvas on high-DPI phones
+  const dpr = window.devicePixelRatio || 1;
+  const W = box.clientWidth, H = box.clientHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+
+  // Metallic gold cover
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, '#E9C46A'); g.addColorStop(0.25, '#C8932A');
+  g.addColorStop(0.5, '#F6DE9A'); g.addColorStop(0.75, '#C8932A'); g.addColorStop(1, '#A87414');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle sparkle dots
+  for (let i = 0; i < 70; i++) {
+    ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.35})`;
+    ctx.beginPath();
+    ctx.arc(Math.random() * W, Math.random() * H, Math.random() * 1.8 + 0.3, 0, 7);
+    ctx.fill();
+  }
+
+  // Inner dashed border
+  ctx.strokeStyle = 'rgba(255,255,255,.55)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 5]);
+  ctx.strokeRect(7, 7, W - 14, H - 14);
+  ctx.setLineDash([]);
+
+  // Label
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('Scratch Here ✨', canvas.width / 2, canvas.height / 2);
+  ctx.shadowColor = 'rgba(107,16,16,.55)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 20px "DM Sans", sans-serif';
+  ctx.fillText('✨ Scratch & Win ✨', W / 2, H / 2 - 9);
+  ctx.font = '600 12px "DM Sans", sans-serif';
+  ctx.fillText(  •  Scratch here', W / 2, H / 2 + 16);
+  ctx.shadowColor = 'transparent';
 
-  let isDrawing = false;
-  let hasScratched = false;
+  let isDrawing = false, hasScratched = false, revealed = false, lastCheck = 0;
 
   function getXY(e) {
-    const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches && e.touches.length > 0 ? e.touches[0].clientY : e.clientY;
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top
-    };
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches && e.touches.length ? e.touches[0] : e;
+    return { x: t.clientX - r.left, y: t.clientY - r.top };
+  }
+
+  function percentCleared() {
+    const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let clear = 0, total = 0;
+    for (let i = 3; i < d.length; i += 64) { total++; if (d[i] === 0) clear++; }  // sample every 16th pixel
+    return clear / total;
+  }
+
+  function celebrate() {
+    revealed = true;
+    box.classList.add('won');
+    noteEl.innerHTML = `🎉 Congrats! <b style="color:var(--green)">₹${scratchDiscount} off</b> will be applied to your order.`;
+    const colors = ['#C8932A', '#8B1A1A', '#2E7D32', '#F0C96A', '#B94040'];
+    for (let i = 0; i < 26; i++) {
+      const c = document.createElement('i');
+      c.className = 'confetti-bit';
+      const a = Math.random() * Math.PI * 2, dist = 60 + Math.random() * 90;
+      c.style.background = colors[i % colors.length];
+      c.style.setProperty('--dx', Math.cos(a) * dist + 'px');
+      c.style.setProperty('--dy', Math.sin(a) * dist - 20 + 'px');
+      c.style.setProperty('--rot', Math.random() * 720 + 'deg');
+      box.appendChild(c);
+      setTimeout(() => c.remove(), 1000);
+    }
+    if (navigator.vibrate) navigator.vibrate([40, 30, 80]);
   }
 
   function scratch(e) {
-    if (!isDrawing) return;
-    if (e.cancelable) e.preventDefault(); // Prevent scrolling while scratching
-    const pos = getXY(e);
-    
+    if (!isDrawing || revealed) return;
+    if (e.cancelable) e.preventDefault();
+    const p = getXY(e);
     ctx.globalCompositeOperation = 'destination-out';
+    ctx.lineWidth = 34; ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, 15, 0, 2 * Math.PI);
+    ctx.arc(p.x, p.y, 17, 0, Math.PI * 2);
     ctx.fill();
+    box.classList.add('touched');
 
     if (!hasScratched) {
       hasScratched = true;
-      // Immediately update the cart bar and the review modal (if open)
       updateCartBar();
-      const totalRow = document.querySelector('.order-summary .total-row span:last-child');
-      if (totalRow) {
-         // Re-render the review modal so the discount line appears
-         openReview(); 
-      }
+      if (document.querySelector('.order-summary .total-row span:last-child')) openReview();
+    }
+    const now = Date.now();
+    if (now - lastCheck > 120) {            // throttle the pixel check
+      lastCheck = now;
+      if (percentCleared() > 0.4) celebrate();
     }
   }
 
   canvas.addEventListener('mousedown', () => isDrawing = true);
-  canvas.addEventListener('touchstart', (e) => { isDrawing = true; scratch(e); }, { passive: false });
-  
+  canvas.addEventListener('touchstart', e => { isDrawing = true; scratch(e); }, { passive: false });
   window.addEventListener('mouseup', () => isDrawing = false);
   window.addEventListener('touchend', () => isDrawing = false);
-  
   canvas.addEventListener('mousemove', scratch);
   canvas.addEventListener('touchmove', scratch, { passive: false });
 }
+
 
 // ══════════════════════════════════════════
 //  CONFIG
@@ -1665,9 +1743,9 @@ async function confirmOrder()
   };
 
   // Reset the scratch card discount so it doesn't apply to their next order
-  scratchDiscount = 0; 
+  scratchDiscount = 0;
   const rewardEl = document.getElementById('scratchReward');
-  if(rewardEl) rewardEl.textContent = '₹0 Discount!';
+  if (rewardEl) rewardEl.innerHTML = '<span class="amt">₹0</span><span class="lbl">Discount</span>';
 
   orders.unshift(order); saveOrders();
   cart={type:activeType,items:[],selectedIds:[],comboPrice:null};

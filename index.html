@@ -2560,7 +2560,7 @@ function renderExpenses(){
   const fCat = document.getElementById('expFilterCat')?.value || '';
 
   const filtered = expItems.filter(e => {
-    return !fCat || (e.category||'') === fCat;
+    return !fCat || (e.category || '').toUpperCase() === fCat.toUpperCase();
   });
 
   // Summary cards — total + by category top 2

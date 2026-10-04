@@ -989,7 +989,7 @@ function toast(msg,dur){
 
 function quickSaveUrl(){
   // quickSaveUrl now called from admin Setup panel only
-  const url = (document.getElementById('url-input')?.value||'').trim();
+  const url = ((document.getElementById('url-input') || {}).value || '').trim();
   if(!url){ toast('URL paste करा'); return; }
   SCRIPT_URL = url;
   CFG.set('tos_script_url', url);

@@ -1362,6 +1362,7 @@ function buildSheetRows(order){
     const pricePerKg = (master && master.price > 0) ? master.price : (Number(ci.unitPrice)||0) * 4; // fallback: unitPrice*4 = per-kg
     const itemAmt = Math.round((pricePerKg / 1000) * ci.weight * ci.qty);
     const amount = isFaral ? itemAmt : (i === 0 ? comboTotal : 0);
+    
     rows.push({
       srNo:            order.uuid + '-' + (i+1),
       orderDate:       dateStr,
@@ -1383,6 +1384,7 @@ function buildSheetRows(order){
       paymentDate:     '',
       toIDBI:          '',
       note:            order.note||'',
+      scratchDiscount: order.scratchDiscount || 0 // <--- THIS LINE PASSES THE DISCOUNT TO THE BACKEND
     });
   });
   return rows;

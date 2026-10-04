@@ -1043,13 +1043,13 @@ let scratchDiscount = 0;
 
 function initScratchCard() {
   const canvas = document.getElementById('scratchCanvas');
-  if (!canvas) return;
+  if (!canvas) return; // Guard clause in case we are on a screen without the canvas
   
   const ctx = canvas.getContext('2d');
   const rewardEl = document.getElementById('scratchReward');
 
-  // Generate random reward up to ₹10
-  scratchDiscount = Math.floor(Math.random() * 10) + 1;
+  // Generate random reward up to ₹15
+  scratchDiscount = Math.floor(Math.random() * 15) + 1;
   rewardEl.textContent = `🎉 ₹${scratchDiscount} Discount!`;
 
   // Draw the gold cover
@@ -1068,8 +1068,8 @@ function initScratchCard() {
 
   function getXY(e) {
     const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches && e.touches.length > 0 ? e.touches[0].clientY : e.clientY;
     return {
       x: clientX - rect.left,
       y: clientY - rect.top
@@ -1078,7 +1078,7 @@ function initScratchCard() {
 
   function scratch(e) {
     if (!isDrawing) return;
-    e.preventDefault(); 
+    if (e.cancelable) e.preventDefault(); // Prevent scrolling while scratching
     const pos = getXY(e);
     
     ctx.globalCompositeOperation = 'destination-out';
@@ -1088,15 +1088,18 @@ function initScratchCard() {
 
     if (!hasScratched) {
       hasScratched = true;
-      // Optional: Store the discount in the cart data immediately when they start scratching
-      // cart.discount = scratchDiscount; 
-      // renderCartBar();
+      // Immediately update the cart bar and the review modal (if open)
+      updateCartBar();
+      const totalRow = document.querySelector('.order-summary .total-row span:last-child');
+      if (totalRow) {
+         // Re-render the review modal so the discount line appears
+         openReview(); 
+      }
     }
   }
 
-  // Event Listeners for scratching
   canvas.addEventListener('mousedown', () => isDrawing = true);
-  canvas.addEventListener('touchstart', (e) => { isDrawing = true; scratch(e); });
+  canvas.addEventListener('touchstart', (e) => { isDrawing = true; scratch(e); }, { passive: false });
   
   window.addEventListener('mouseup', () => isDrawing = false);
   window.addEventListener('touchend', () => isDrawing = false);
@@ -1239,17 +1242,28 @@ function fmtDate(d){
   const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return String(d.getDate()).padStart(2,'0')+'-'+mo[d.getMonth()]+'-'+d.getFullYear();
 }
-function getTotal(){
-  if(cart.comboPrice!=null) return cart.comboPrice;
-  return cart.items.reduce((s,x)=>s+x.unitPrice*x.qty,0);
+
+function getTotal() {
+  let baseTotal = 0;
+  
+  if (cart.comboPrice != null) {
+    baseTotal = cart.comboPrice;
+  } else {
+    baseTotal = cart.items.reduce((s, x) => s + x.unitPrice * x.qty, 0);
+  }
+
+  // Deduct scratch discount
+  let finalTotal = baseTotal - (scratchDiscount || 0);
+  return Math.max(0, finalTotal);
 }
-function updateCartBar(){
-  const n=cart.items.reduce((s,x)=>s+x.qty,0);
-  const bar=document.getElementById('cart-bar');
-  if(n===0){bar.style.display='none';return;}
-  bar.style.display='';
-  document.getElementById('cart-items-txt').textContent=n+' पदार्थ निवडले';
-  document.getElementById('cart-total-txt').textContent=fmt(getTotal());
+
+function updateCartBar() {
+  const n = cart.items.reduce((s, x) => s + x.qty, 0);
+  const bar = document.getElementById('cart-bar');
+  if (n === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = '';
+  document.getElementById('cart-items-txt').textContent = n + ' पदार्थ निवडले';
+  document.getElementById('cart-total-txt').textContent = fmt(getTotal());
 }
 
 // ══════════════════════════════════════════
@@ -1418,6 +1432,7 @@ function setType(t){
   activeType=t;
   cart={type:t,items:[],selectedIds:[],comboPrice:null};
   renderTabs();renderBody();updateCartBar();
+  initScratchCard(); // <--- ADD THIS HERE
 }
 
 // ══════════════════════════════════════════
@@ -1563,7 +1578,11 @@ function faralQty(id,d){
 // ══════════════════════════════════════════
 function openReview(){
   if(!cart.items.length){toast('कार्ट रिकामे आहे');return;}
-  const total=getTotal();
+  
+  const subtotal = cart.comboPrice != null ? cart.comboPrice : cart.items.reduce((s,x)=>s+x.unitPrice*x.qty,0);
+  const discount = scratchDiscount || 0; 
+  const total = Math.max(0, subtotal - discount);
+
   document.getElementById('modal-title').textContent='ऑर्डर तपासा';
   document.getElementById('modal-body').innerHTML=`
     ${cart.items.map(ci=>`
@@ -1580,6 +1599,14 @@ function openReview(){
       </div>`).join('')}
     <div class="summary-block">
       <div class="sum-row"><span>Order Type</span><span style="font-weight:500;">${activeType}</span></div>
+      
+      <div class="sum-row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
+      ${discount > 0 ? `
+      <div class="sum-row">
+        <span>🎉 Scratch Card Offer</span>
+        <span style="color:var(--green); font-weight:bold;">-${fmt(discount)}</span>
+      </div>` : ''}
+      
       <div class="sum-row total"><span>एकूण / Total</span><span>${fmt(total)}</span></div>
     </div>
     <div class="form-section">
@@ -1611,7 +1638,8 @@ function openReview(){
 // ══════════════════════════════════════════
 //  CONFIRM + SYNC
 // ══════════════════════════════════════════
-async function confirmOrder(){
+async function confirmOrder()
+{
   const name  = document.getElementById('f-name').value.trim();
   const phone = document.getElementById('f-phone').value.trim();
   const loc   = document.getElementById('f-loc').value.trim();
@@ -1624,23 +1652,28 @@ async function confirmOrder(){
   const uuid    = genUUID();
   const orderId = 'TOS-'+uuid;
   const total   = getTotal();
+  const appliedDiscount = scratchDiscount || 0; // Capture discount for this order
 
   const order={
     id:orderId, uuid, customer:name, phone,
     deliveryLocation:loc, referredBy:ref, note, orderType:activeType,
     items:[...cart.items], total,
+    scratchDiscount: appliedDiscount,
     status:'CONFIRMED', payment:'PENDING',
     paymentMode:'', paymentDate:'', deliveryDate:'',
     createdAt:Date.now(), synced:false
   };
 
+  // Reset the scratch card discount so it doesn't apply to their next order
+  scratchDiscount = 0; 
+  const rewardEl = document.getElementById('scratchReward');
+  if(rewardEl) rewardEl.textContent = '₹0 Discount!';
+
   orders.unshift(order); saveOrders();
   cart={type:activeType,items:[],selectedIds:[],comboPrice:null};
   updateCartBar(); renderBody();
-  // Schedule admin notification — runs after success screen renders
   setTimeout(() => notifyAdmin(order), 1500);
 
-  // Show success screen immediately
   const sid='sync-'+uuid;
   document.getElementById('modal-title').textContent='✓ ऑर्डर मिळाली!';
   document.getElementById('modal-body').innerHTML=`
@@ -1662,20 +1695,16 @@ async function confirmOrder(){
       </div>
     </div>`;
 
-  // Sync in background
   if(SCRIPT_URL){
     const r = await syncToSheet(order);
     const el = document.getElementById(sid);
     if(r&&r.status==='ok'){
       order.synced=true; saveOrders();
       if(el){el.className='sync-msg ok';el.textContent='📊 ✅ Google Sheet मध्ये सेव्ह झाले!';}
-      // Notify admin via WhatsApp
-      const adminPh = CFG.get('tos_admin_phone','') || HARDCODED_URL && '';
       notifyAdmin(order);
     } else if(r&&r.status==='skip'){
       if(el) el.remove();
     } else {
-      // Keep synced:false so admin can retry later
       if(el){el.className='sync-msg fail';el.textContent='📊 ⚠️ Sheet sync failed — locally saved. Admin मध्ये Sync करता येईल.';}
     }
   }
@@ -3689,8 +3718,10 @@ function _showPWAManualInstructions(){
   var o=document.getElementById('overlay');
   o.style.display='flex'; requestAnimationFrame(function(){o.classList.add('open');});
 }
-// Initialize scratch card on load
-  initScratchCard();
+// Initialize scratch card when everything is loaded
+  document.addEventListener("DOMContentLoaded", function() {
+    initScratchCard();
+  });
 </script>
 
 

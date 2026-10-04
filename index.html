@@ -2079,13 +2079,15 @@ function openEdit(encodedKey){
           <div class="isc-emoji">🍱</div>
           <div class="isc-info">
             <div class="isc-name">${ci.en||'Item'}</div>
-            <div class="isc-sub" id="isc-sub-${idx}">${ci.weight||''}g × ${ci.qty||1}${ci.unitPrice>0?' · '+fmtAmt(ci.unitPrice):''}</div>
+            <div class="isc-sub" id="isc-sub-${idx}">${ci.weight||''}g × ${ci.qty||1}${(Number(ci.unitPrice)||0)>0?' · '+fmtAmt(ci.unitPrice):''}</div>
             ${o.orderType==='FARAL' ? `
             <div class="isc-edit-row">
               <label>Wt(g):</label>
-              <input type="number" id="isc-wt-${idx}" value="${ci.weight||250}" min="1" max="5000" oninput="recalcItemAmt(${idx})">
+              <input type="number" id="isc-wt-${idx}" value="${ci.weight\vert{}\vert{}250}" min="1" max="5000" oninput="recalcItemAmt(${idx})">
               <label>Qty:</label>
-              <input type="number" id="isc-qty-${idx}" value="${ci.qty||1}" min="1" max="99" oninput="recalcItemAmt(${idx})">
+              <input type="number" id="isc-qty-${idx}" value="${ci.qty\vert{}\vert{}1}" min="1" max="99" oninput="recalcItemAmt(${idx})">
+              <label>Amt(₹):</label>
+              <input type="number" id="isc-amt-${idx}" value="${ci.unitPrice||0}" min="0" style="width:65px;">
             </div>` : `
             <div style="font-size:10px;color:var(--text3);margin-top:4px;">
               🔒 Combo — Wt/Qty edit not allowed
@@ -2103,7 +2105,6 @@ function openEdit(encodedKey){
 
   document.getElementById('modal-body').innerHTML = `
     <div class="modal-section">
-
       <!-- Order summary -->
       <div class="order-summary">
         <div class="sum-row"><span>Customer</span><strong>${o.customer||'—'}</strong></div>
@@ -2113,7 +2114,7 @@ function openEdit(encodedKey){
         ${o.referredBy?`<div class="sum-row"><span>Referred By</span><strong>${o.referredBy}</strong></div>`:''}
         <div class="sum-row total-row"><span>Total</span><span>${fmtAmt(o.total)}</span></div>
       </div>
-      <button onclick="waOpen('${o.phone}', waMsgConfirmation(o))"
+      <button onclick="waOpen('${o.phone}', waMsgConfirmation(allOrders.find(x=>(x.groupKey||x.id)==='${gk}')))"
         style="display:flex;align-items:center;gap:8px;width:100%;margin-bottom:12px;
         padding:9px 14px;background:#E8F5E9;color:#1B5E20;border:1.5px solid #2E7D32;
         border-radius:var(--r-sm);font-size:12px;font-weight:600;cursor:pointer;
@@ -2124,12 +2125,10 @@ function openEdit(encodedKey){
       <!-- ── SECTION 1: Item-wise Status ── -->
       <div class="pay-section-title">📦 Item-wise Status</div>
       <div id="items-section">${itemsHtml}</div>
-
       <div class="divider"></div>
 
       <!-- ── SECTION 2: Payment & Delivery ── -->
       <div class="pay-section-title">💰 Payment & Delivery Details</div>
-
       <div class="field-row" style="margin-bottom:12px;">
         <div class="field" style="margin-bottom:0;">
           <label>Payment Status</label>
@@ -2148,7 +2147,6 @@ function openEdit(encodedKey){
           </select>
         </div>
       </div>
-
       <div class="field-row" style="margin-bottom:12px;">
         <div class="field" style="margin-bottom:0;">
           <label>Payment Date</label>
@@ -2159,7 +2157,6 @@ function openEdit(encodedKey){
           <input type="date" id="f-ddate" value="${o.deliveryDate||''}">
         </div>
       </div>
-
       <div class="field" style="margin-bottom:0;">
         <label>To IDBI</label>
         <select id="f-idbi">
@@ -2168,9 +2165,7 @@ function openEdit(encodedKey){
           <option value="NO"  ${o.toIDBI==='NO' ?'selected':''}>NO</option>
         </select>
       </div>
-
     </div>
-
     <button class="confirm-btn" onclick="savePaymentDetails()">💾 Save Payment & Delivery</button>
     <div style="height:8px;"></div>
     <button class="del-order-btn" onclick="confirmDeleteOrder()">🗑 Delete This Order</button>
@@ -2180,7 +2175,6 @@ function openEdit(encodedKey){
   { const _o=document.getElementById('overlay'); _o.style.display='flex'; requestAnimationFrame(()=>_o.classList.add('open')); }
 }
 
-
 // ── Live amount recalc when Wt or Qty changes in edit modal ──
 function recalcItemAmt(idx){
   const o = allOrders.find(x => (x.groupKey||x.id) === editingKey);
@@ -2188,17 +2182,19 @@ function recalcItemAmt(idx){
   const ci = o.items[idx];
   const wtEl  = document.getElementById('isc-wt-'  + idx);
   const qtyEl = document.getElementById('isc-qty-' + idx);
-  const subEl = document.getElementById('isc-sub-' + idx);
-  if(!wtEl || !qtyEl || !subEl) return;
+  const amtEl = document.getElementById('isc-amt-' + idx);
+  
+  if(!wtEl || !qtyEl || !amtEl) return;
+  
   const wt  = parseInt(wtEl.value)  || ci.weight || 250;
   const qty = parseInt(qtyEl.value) || 1;
-  const master     = (typeof ITEMS !== 'undefined') ? ITEMS.find(x => x.en === ci.en) : null;
-  const pricePerKg = master
-    ? master.price
-    : Math.round((Number(ci.unitPrice)||0) / (Number(ci.weight)||250) * 1000);
-  const newUnitPrice = Math.round((pricePerKg / 1000) * wt);
-  const newTotal     = newUnitPrice * qty;
-  subEl.textContent  = wt + 'g × ' + qty + (newTotal > 0 ? ' · ' + fmtAmt(newTotal) : '');
+  const master = (typeof ITEMS !== 'undefined') ? ITEMS.find(x => x.en === ci.en) : null;
+  
+  // Auto-calculate the new amount based on Master rate card
+  if(master && master.price > 0) {
+    const newTotal = Math.round((master.price / 1000) * wt * qty);
+    amtEl.value = newTotal;
+  }
 }
 
 // ── Update a single item's status in Sheet ──
@@ -2211,8 +2207,10 @@ async function updateItemStatus(itemIdx, encodedSrNo){
   
   const o0     = allOrders.find(x => (x.groupKey||x.id) === editingKey);
   const isFaralOrder = o0?.orderType === 'FARAL';
+  
   const newWt  = isFaralOrder ? (parseInt(document.getElementById('isc-wt-' +itemIdx)?.value)||0) : 0;
   const newQty = isFaralOrder ? (parseInt(document.getElementById('isc-qty-'+itemIdx)?.value)||1) : 0;
+  const newAmt = isFaralOrder ? parseInt(document.getElementById('isc-amt-'+itemIdx)?.value) : undefined;
 
   btn.textContent = '⏳';
   btn.disabled    = true;
@@ -2224,24 +2222,28 @@ async function updateItemStatus(itemIdx, encodedSrNo){
   if(o && o.items && o.items[itemIdx]){
     o.items[itemIdx].itemStatus = newStatus;
     
-    // RECALCULATE AMOUNT FOR FARAL
-    if(isFaralOrder && (newWt > 0 || newQty > 0)) {
-      const master = (typeof ITEMS !== 'undefined') ? ITEMS.find(x => x.en === o.items[itemIdx].en) : null;
-      const pricePerKg = master ? master.price : Math.round((Number(o.items[itemIdx].unitPrice)||0) / (Number(o.items[itemIdx].weight)||250) * 1000);
-      
+    const currentWt  = Number(o.items[itemIdx].weight) || 0;
+    const currentQty = Number(o.items[itemIdx].qty) || 1;
+    const currentAmt = Number(o.items[itemIdx].unitPrice) || 0; // Note: unitPrice holds the row's total amount
+    
+    // Re-calculate ONLY if anything was actually modified
+    if(isFaralOrder && (newWt !== currentWt || newQty !== currentQty || newAmt !== currentAmt)) {
       if(newWt > 0) o.items[itemIdx].weight = newWt;
       if(newQty > 0) o.items[itemIdx].qty   = newQty;
       
-      const newUnitPrice = Math.round((pricePerKg / 1000) * o.items[itemIdx].weight);
-      o.items[itemIdx].unitPrice = newUnitPrice;
+      // Use the manual/auto-calculated amount from the input box
+      const finalItemAmt = (newAmt !== undefined && !isNaN(newAmt)) ? newAmt : currentAmt;
+      o.items[itemIdx].unitPrice = finalItemAmt;
+      newTotalAmtForSheet = finalItemAmt;
       
-      // Update Grand Total
-      o.total = o.items.reduce((sum, item) => sum + (item.unitPrice * item.qty), 0);
-      newTotalAmtForSheet = newUnitPrice * o.items[itemIdx].qty;
+      // Update Grand Total 
+      o.total = o.items.reduce((sum, item) => sum + Number(item.unitPrice || 0), 0);
 
-      // Update the visual Grand Total in the DOM
       const totalRowSpan = document.querySelector('.order-summary .total-row span:last-child');
       if(totalRowSpan) totalRowSpan.textContent = fmtAmt(o.total);
+      
+      const subEl = document.getElementById('isc-sub-' + itemIdx);
+      if(subEl) subEl.textContent = newWt + 'g × ' + newQty + ' · ' + fmtAmt(finalItemAmt);
     }
 
     const statusOrder = STATUS_OPTIONS;
@@ -2271,7 +2273,6 @@ async function updateItemStatus(itemIdx, encodedSrNo){
   try {
     let body;
     if(srNo && srNo !== 'undefined' && srNo !== ''){
-      // ADDED: newAmount property sent to backend
       body = JSON.stringify({ 
         action:'update_item', 
         srNo, 
